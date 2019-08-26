@@ -4,11 +4,9 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import com.topjohnwu.magisk.Config
 import com.topjohnwu.magisk.Const
-import com.topjohnwu.magisk.Info
 import com.topjohnwu.magisk.R
-import com.topjohnwu.magisk.extensions.rawResource
-import com.topjohnwu.magisk.extensions.toShellCmd
 import com.topjohnwu.superuser.Shell
 import com.topjohnwu.superuser.ShellUtils
 import com.topjohnwu.superuser.io.SuFile
@@ -134,7 +132,7 @@ class RootUtils : Shell.Initializer() {
             job.add(context.rawResource(R.raw.util_functions))
                     .add(context.rawResource(R.raw.utils))
             Const.MAGISK_DISABLE_FILE = SuFile("/cache/.disable_magisk")
-            Info.loadMagiskInfo()
+            Config.loadMagiskInfo()
         } else {
             job.add(context.rawResource(R.raw.nonroot_utils))
         }
@@ -145,16 +143,22 @@ class RootUtils : Shell.Initializer() {
                 "export BOOTMODE=true")
                 .exec()
 
-        Info.keepVerity = ShellUtils.fastCmd("echo \$KEEPVERITY").toBoolean()
-        Info.keepEnc = ShellUtils.fastCmd("echo \$KEEPFORCEENCRYPT").toBoolean()
-        Info.recovery = ShellUtils.fastCmd("echo \$RECOVERYMODE").toBoolean()
+        Config.keepVerity = ShellUtils.fastCmd("echo \$KEEPVERITY").toBoolean()
+        Config.keepEnc = ShellUtils.fastCmd("echo \$KEEPFORCEENCRYPT").toBoolean()
+        Config.recovery = ShellUtils.fastCmd("echo \$RECOVERYMODE").toBoolean()
         return true
     }
 
     companion object {
 
+        @JvmStatic
         fun rmAndLaunch(rm: String, component: ComponentName) {
             Shell.su("(rm_launch $rm ${component.flattenToString()})").exec()
+        }
+
+        @JvmStatic
+        fun reboot() {
+            Shell.su("/system/bin/reboot ${if (Config.recovery) "recovery" else ""}").submit()
         }
     }
 }

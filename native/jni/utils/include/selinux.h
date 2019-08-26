@@ -18,7 +18,9 @@
 #define SEPOL_PROC_DOMAIN   "magisk"
 #define SEPOL_FILE_DOMAIN   "magisk_file"
 
-__BEGIN_DECLS
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 extern void (*freecon)(char *con);
 extern int (*setcon)(const char *con);
@@ -36,4 +38,6 @@ void dload_selinux();
 void restorecon();
 void restore_rootcon();
 
-__END_DECLS
+#ifdef __cplusplus
+}
+#endif

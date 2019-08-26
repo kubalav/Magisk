@@ -308,7 +308,6 @@ int unpack(const char *image, bool hdr) {
 		decompress(boot.k_fmt, fd, boot.kernel, boot.hdr->kernel_size);
 		close(fd);
 	} else {
-		fprintf(stderr, "Kernel is uncompressed or not a supported compressed type!\n");
 		dump(boot.kernel, boot.hdr->kernel_size, KERNEL_FILE);
 	}
 
@@ -321,7 +320,6 @@ int unpack(const char *image, bool hdr) {
 		decompress(boot.r_fmt, fd, boot.ramdisk, boot.hdr->ramdisk_size);
 		close(fd);
 	} else {
-		fprintf(stderr, "Ramdisk is uncompressed or not a supported compressed type!\n");
 		dump(boot.ramdisk, boot.hdr->ramdisk_size, RAMDISK_FILE);
 	}
 
@@ -340,7 +338,7 @@ int unpack(const char *image, bool hdr) {
 }
 
 #define file_align() write_zero(fd, align_off(lseek(fd, 0, SEEK_CUR) - header_off, boot.hdr.page_size()))
-void repack(const char* orig_image, const char* out_image, bool force_nocomp) {
+void repack(const char* orig_image, const char* out_image) {
 	boot_img boot {};
 
 	off_t header_off, kernel_off, ramdisk_off, second_off, extra_off, dtb_off;
@@ -419,7 +417,7 @@ void repack(const char* orig_image, const char* out_image, bool force_nocomp) {
 		size_t raw_size;
 		void *raw_buf;
 		mmap_ro(KERNEL_FILE, raw_buf, raw_size);
-		if (!COMPRESSED_ANY(check_fmt(raw_buf, raw_size)) && COMPRESSED(boot.k_fmt)) {
+		if (!COMPRESSED(check_fmt(raw_buf, raw_size)) && COMPRESSED(boot.k_fmt)) {
 			boot.hdr->kernel_size = compress(boot.k_fmt, fd, raw_buf, raw_size);
 		} else {
 			boot.hdr->kernel_size = write(fd, raw_buf, raw_size);
@@ -442,7 +440,7 @@ void repack(const char* orig_image, const char* out_image, bool force_nocomp) {
 		size_t raw_size;
 		void *raw_buf;
 		mmap_ro(RAMDISK_FILE, raw_buf, raw_size);
-		if (!COMPRESSED_ANY(check_fmt(raw_buf, raw_size)) && COMPRESSED(boot.r_fmt) && !force_nocomp) {
+		if (!COMPRESSED(check_fmt(raw_buf, raw_size)) && COMPRESSED(boot.r_fmt)) {
 			boot.hdr->ramdisk_size = compress(boot.r_fmt, fd, raw_buf, raw_size);
 		} else {
 			boot.hdr->ramdisk_size = write(fd, raw_buf, raw_size);

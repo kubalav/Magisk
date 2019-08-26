@@ -1,6 +1,8 @@
 package com.topjohnwu.magisk.utils
 
 import android.view.View
+import android.widget.AdapterView
+import android.widget.Spinner
 import android.widget.TextView
 import androidx.annotation.ColorInt
 import androidx.annotation.DrawableRes
@@ -11,14 +13,11 @@ import androidx.databinding.InverseBindingAdapter
 import androidx.databinding.InverseBindingListener
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.interpolator.view.animation.FastOutSlowInInterpolator
-import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager.widget.ViewPager
-import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.navigation.NavigationView
 import com.skoumal.teanity.extensions.subscribeK
 import com.topjohnwu.magisk.R
-import com.topjohnwu.magisk.extensions.replaceRandomWithSpecial
 import com.topjohnwu.magisk.model.entity.state.IndeterminateState
 import io.reactivex.Observable
 import io.reactivex.disposables.Disposable
@@ -116,7 +115,7 @@ fun setMovieBehavior(view: TextView, isMovieBehavior: Boolean, text: String) {
     }
 }
 
-/*@BindingAdapter("selection"*//*, "selectionAttrChanged", "adapter"*//*)
+@BindingAdapter("android:selectedItemPosition")
 fun setSelectedItemPosition(view: Spinner, position: Int) {
     view.setSelection(position)
 }
@@ -127,7 +126,7 @@ fun setSelectedItemPosition(view: Spinner, position: Int) {
 )
 fun getSelectedItemPosition(view: Spinner) = view.selectedItemPosition
 
-@BindingAdapter("selectedItemPositionAttrChanged")
+@BindingAdapter("android:selectedItemPositionAttrChanged")
 fun setSelectedItemPositionListener(view: Spinner, listener: InverseBindingListener) {
     view.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
         override fun onNothingSelected(p0: AdapterView<*>?) {
@@ -138,7 +137,7 @@ fun setSelectedItemPositionListener(view: Spinner, listener: InverseBindingListe
             listener.onChange()
         }
     }
-}*/
+}
 
 @BindingAdapter("onTouch")
 fun setOnTouchListener(view: View, listener: View.OnTouchListener) {
@@ -156,6 +155,8 @@ fun setScrollToLast(view: RecyclerView, shouldScrollToLast: Boolean) {
         Observable.timer(1, TimeUnit.SECONDS).subscribeK { callback() }
     }
 
+    val tag = RecyclerView::class.java.name.sumBy { it.toInt() }
+
     fun RecyclerView.Adapter<*>.setListener() {
         val observer = object : RecyclerView.AdapterDataObserver() {
             override fun onItemRangeInserted(positionStart: Int, itemCount: Int) {
@@ -163,12 +164,11 @@ fun setScrollToLast(view: RecyclerView, shouldScrollToLast: Boolean) {
             }
         }
         registerAdapterDataObserver(observer)
-        view.setTag(R.id.recyclerScrollListener, observer)
+        view.setTag(tag, observer)
     }
 
     fun RecyclerView.Adapter<*>.removeListener() {
-        val observer =
-            view.getTag(R.id.recyclerScrollListener) as? RecyclerView.AdapterDataObserver ?: return
+        val observer = view.getTag(tag) as? RecyclerView.AdapterDataObserver ?: return
         unregisterAdapterDataObserver(observer)
     }
 
@@ -179,45 +179,4 @@ fun setScrollToLast(view: RecyclerView, shouldScrollToLast: Boolean) {
     } else {
         view.adapter?.removeListener()
     }
-}
-
-@BindingAdapter("hide")
-fun setHidden(view: FloatingActionButton, hide: Boolean) {
-    if (hide) view.hide() else view.show()
-}
-
-@BindingAdapter("scrollPosition", "scrollPositionSmooth", requireAll = false)
-fun setScrollPosition(view: RecyclerView, position: Int, smoothScroll: Boolean) {
-    val adapterItemCount = view.adapter?.itemCount ?: -1
-    if (position !in 0 until adapterItemCount) {
-        // the position is not in adapter bounds, adapter will throw exception for invalid positions
-        return
-    }
-
-    when {
-        smoothScroll -> view.smoothScrollToPosition(position)
-        else -> view.scrollToPosition(position)
-    }
-}
-
-@BindingAdapter("recyclerScrollEvent")
-fun setScrollListener(view: RecyclerView, listener: InverseBindingListener) {
-    view.addOnScrollListener(object : RecyclerView.OnScrollListener() {
-        override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
-            // don't change this or the recycler will stop at every line, effectively disabling smooth scroll
-            if (newState == RecyclerView.SCROLL_STATE_IDLE) {
-                listener.onChange()
-            }
-        }
-    })
-}
-
-@InverseBindingAdapter(attribute = "scrollPosition", event = "recyclerScrollEvent")
-fun getScrollPosition(view: RecyclerView) = (view.layoutManager as? LinearLayoutManager)
-    ?.findLastCompletelyVisibleItemPosition()
-    ?: -1
-
-@BindingAdapter("isEnabled")
-fun setEnabled(view: View, isEnabled: Boolean) {
-    view.isEnabled = isEnabled
 }

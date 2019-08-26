@@ -21,7 +21,7 @@ class LogFragment : MagiskFragment<LogViewModel, FragmentLogBinding>() {
     override fun onEventDispatched(event: ViewEvent) {
         super.onEventDispatched(event)
         when (event) {
-            is PageChangedEvent -> activity.invalidateOptionsMenu()
+            is PageChangedEvent -> magiskActivity.invalidateOptionsMenu()
         }
     }
 
@@ -33,7 +33,7 @@ class LogFragment : MagiskFragment<LogViewModel, FragmentLogBinding>() {
     override fun onStart() {
         super.onStart()
         setHasOptionsMenu(true)
-        activity.setTitle(R.string.log)
+        magiskActivity.setTitle(R.string.log)
     }
 
     override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
@@ -43,11 +43,7 @@ class LogFragment : MagiskFragment<LogViewModel, FragmentLogBinding>() {
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
-            R.id.menu_save -> activity.withExternalRW {
-                onSuccess {
-                    viewModel.saveLog()
-                }
-            }
+            R.id.menu_save -> viewModel.saveLog()
             R.id.menu_clear -> viewModel.clearLog()
             R.id.menu_refresh -> viewModel.refresh()
         }

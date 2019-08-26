@@ -20,13 +20,14 @@
 #include <sys/mount.h>
 #include <sys/mman.h>
 #include <sys/sendfile.h>
+#include <sys/syscall.h>
 
 #include <logging.h>
 #include <utils.h>
 
 FILE *xfopen(const char *pathname, const char *mode) {
 	FILE *fp = fopen(pathname, mode);
-	if (fp == nullptr) {
+	if (fp == NULL) {
 		PLOGE("fopen: %s", pathname);
 	}
 	return fp;
@@ -34,13 +35,13 @@ FILE *xfopen(const char *pathname, const char *mode) {
 
 FILE *xfdopen(int fd, const char *mode) {
 	FILE *fp = fdopen(fd, mode);
-	if (fp == nullptr) {
+	if (fp == NULL) {
 		PLOGE("fopen");
 	}
 	return fp;
 }
 
-int xopen(const char *pathname, int flags) {
+int xopen2(const char *pathname, int flags) {
 	int fd = open(pathname, flags);
 	if (fd < 0) {
 		PLOGE("open: %s", pathname);
@@ -48,7 +49,7 @@ int xopen(const char *pathname, int flags) {
 	return fd;
 }
 
-int xopen(const char *pathname, int flags, mode_t mode) {
+int xopen3(const char *pathname, int flags, mode_t mode) {
 	int fd = open(pathname, flags, mode);
 	if (fd < 0) {
 		PLOGE("open: %s", pathname);
@@ -99,7 +100,7 @@ int xpipe2(int pipefd[2], int flags) {
 }
 
 int xsetns(int fd, int nstype) {
-	int ret = setns(fd, nstype);
+	int ret = (int) syscall(__NR_setns, fd, nstype);
 	if (ret == -1) {
 		PLOGE("setns");
 	}
@@ -107,7 +108,7 @@ int xsetns(int fd, int nstype) {
 }
 
 int xunshare(int flags) {
-	int ret = unshare(flags);
+	int ret = (int) syscall(__NR_unshare, flags);
 	if (ret == -1) {
 		PLOGE("unshare");
 	}
@@ -116,7 +117,7 @@ int xunshare(int flags) {
 
 DIR *xopendir(const char *name) {
 	DIR *d = opendir(name);
-	if (d == nullptr) {
+	if (d == NULL) {
 		PLOGE("opendir: %s", name);
 	}
 	return d;
@@ -124,7 +125,7 @@ DIR *xopendir(const char *name) {
 
 DIR *xfdopendir(int fd) {
 	DIR *d = fdopendir(fd);
-	if (d == nullptr) {
+	if (d == NULL) {
 		PLOGE("fdopendir");
 	}
 	return d;
@@ -133,7 +134,7 @@ DIR *xfdopendir(int fd) {
 struct dirent *xreaddir(DIR *dirp) {
 	errno = 0;
 	struct dirent *e = readdir(dirp);
-	if (errno && e == nullptr) {
+	if (errno && e == NULL) {
 		PLOGE("readdir");
 	}
 	return e;
@@ -187,7 +188,7 @@ static int accept4_compat(int sockfd, struct sockaddr *addr, socklen_t *addrlen,
 }
 
 int xaccept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags) {
-	int fd = accept4(sockfd, addr, addrlen, flags);
+	int fd = (int) syscall(__NR_accept4, sockfd, addr, addrlen, flags);
 	if (fd == -1) {
 		if (errno == ENOSYS)
 			return accept4_compat(sockfd, addr, addrlen, flags);
@@ -198,7 +199,7 @@ int xaccept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags) {
 
 void *xmalloc(size_t size) {
 	void *p = malloc(size);
-	if (p == nullptr) {
+	if (p == NULL) {
 		PLOGE("malloc");
 	}
 	return p;
@@ -206,7 +207,7 @@ void *xmalloc(size_t size) {
 
 void *xcalloc(size_t nmemb, size_t size) {
 	void *p = calloc(nmemb, size);
-	if (p == nullptr) {
+	if (p == NULL) {
 		PLOGE("calloc");
 	}
 	return p;
@@ -214,7 +215,7 @@ void *xcalloc(size_t nmemb, size_t size) {
 
 void *xrealloc(void *ptr, size_t size) {
 	void *p = realloc(ptr, size);
-	if (p == nullptr) {
+	if (p == NULL) {
 		PLOGE("realloc");
 	}
 	return p;
@@ -278,7 +279,7 @@ int xdup2(int oldfd, int newfd) {
 }
 
 int xdup3(int oldfd, int newfd, int flags) {
-	int ret = dup3(oldfd, newfd, flags);
+	int ret = (int) syscall(__NR_dup3, oldfd, newfd, flags);
 	if (ret == -1) {
 		PLOGE("dup3");
 	}
@@ -296,7 +297,7 @@ ssize_t xreadlink(const char *pathname, char *buf, size_t bufsiz) {
 }
 
 ssize_t xreadlinkat(int dirfd, const char *pathname, char *buf, size_t bufsiz) {
-	ssize_t ret = readlinkat(dirfd, pathname, buf, bufsiz);
+	ssize_t ret = syscall(__NR_readlinkat, dirfd, pathname, buf, bufsiz);
 	if (ret == -1) {
 		PLOGE("readlinkat %s", pathname);
 	} else {
@@ -314,7 +315,7 @@ int xsymlink(const char *target, const char *linkpath) {
 }
 
 int xsymlinkat(const char *target, int newdirfd, const char *linkpath) {
-	int ret = symlinkat(target, newdirfd, linkpath);
+	int ret = (int) syscall(__NR_symlinkat, target, newdirfd, linkpath);
 	if (ret == -1) {
 		PLOGE("symlinkat %s->%s", target, linkpath);
 	}
@@ -322,7 +323,7 @@ int xsymlinkat(const char *target, int newdirfd, const char *linkpath) {
 }
 
 int xlinkat(int olddirfd, const char *oldpath, int newdirfd, const char *newpath, int flags) {
-	int ret = linkat(olddirfd, oldpath, newdirfd, newpath, flags);
+	int ret = (int) syscall(__NR_linkat, olddirfd, oldpath, newdirfd, newpath, flags);
 	if (ret == -1) {
 		PLOGE("linkat %s->%s", oldpath, newpath);
 	}
@@ -421,7 +422,7 @@ int xpoll(struct pollfd *fds, nfds_t nfds, int timeout) {
 }
 
 int xinotify_init1(int flags) {
-	int ret = inotify_init1(flags);
+	int ret = syscall(__NR_inotify_init1, flags);
 	if (ret == -1) {
 		PLOGE("inotify_init1");
 	}

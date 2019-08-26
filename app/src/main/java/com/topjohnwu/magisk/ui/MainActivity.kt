@@ -4,11 +4,9 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.core.view.GravityCompat
 import androidx.fragment.app.Fragment
-import com.skoumal.teanity.extensions.addOnPropertyChangedCallback
 import com.topjohnwu.magisk.ClassMap
 import com.topjohnwu.magisk.Config
 import com.topjohnwu.magisk.Const.Key.OPEN_SECTION
-import com.topjohnwu.magisk.Info
 import com.topjohnwu.magisk.R
 import com.topjohnwu.magisk.databinding.ActivityMainBinding
 import com.topjohnwu.magisk.model.navigation.Navigation
@@ -21,6 +19,7 @@ import com.topjohnwu.magisk.ui.module.ReposFragment
 import com.topjohnwu.magisk.ui.settings.SettingsFragment
 import com.topjohnwu.magisk.ui.superuser.SuperuserFragment
 import com.topjohnwu.magisk.utils.Utils
+import com.topjohnwu.net.Networking
 import com.topjohnwu.superuser.Shell
 import org.koin.androidx.viewmodel.ext.android.viewModel
 import kotlin.reflect.KClass
@@ -56,10 +55,6 @@ open class MainActivity : MagiskActivity<MainViewModel, ActivityMainBinding>() {
         super.onCreate(savedInstanceState)
         checkHideSection()
         setSupportActionBar(binding.mainInclude.mainToolbar)
-
-        viewModel.isConnected.addOnPropertyChangedCallback {
-            checkHideSection()
-        }
 
         if (savedInstanceState == null) {
             intent.getStringExtra(OPEN_SECTION)?.let {
@@ -110,11 +105,11 @@ open class MainActivity : MagiskActivity<MainViewModel, ActivityMainBinding>() {
     private fun checkHideSection() {
         val menu = binding.navView.menu
         menu.findItem(R.id.magiskHideFragment).isVisible =
-            Shell.rootAccess() && Config.magiskHide
+            Shell.rootAccess() && Config.get<Any>(Config.Key.MAGISKHIDE) as Boolean
         menu.findItem(R.id.modulesFragment).isVisible =
-            Shell.rootAccess() && Info.magiskVersionCode >= 0
+            Shell.rootAccess() && Config.magiskVersionCode >= 0
         menu.findItem(R.id.reposFragment).isVisible =
-            (viewModel.isConnected.value && Shell.rootAccess() && Info.magiskVersionCode >= 0)
+            (Networking.checkNetworkStatus(this) && Shell.rootAccess() && Config.magiskVersionCode >= 0)
         menu.findItem(R.id.logFragment).isVisible =
             Shell.rootAccess()
         menu.findItem(R.id.superuserFragment).isVisible =

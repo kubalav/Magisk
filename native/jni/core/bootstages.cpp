@@ -88,14 +88,12 @@ node_entry::~node_entry() {
 		delete node;
 }
 
-#define SPECIAL_NODE (parent->parent ? false : (name == "vendor" || name == "product"))
-
 bool node_entry::is_special() {
-	return parent ? SPECIAL_NODE : false;
+	return parent ? (parent->parent ? false : name == "vendor") : false;
 }
 
 bool node_entry::is_root() {
-	return parent ? SPECIAL_NODE : true;
+	return parent ? (parent->parent ? false : name == "vendor") : true;
 }
 
 string node_entry::get_path() {
@@ -309,13 +307,13 @@ static int bind_mount(const char *from, const char *to, bool log) {
 
 #define MIRRMNT(part)   MIRRDIR "/" #part
 #define PARTBLK(part)   BLOCKDIR "/" #part
-#define DIR_IS(part)    (me->mnt_dir == "/" #part ""sv)
 
 #define mount_mirror(part, flag) { \
-	xstat(me->mnt_fsname, &st); \
-	mknod(PARTBLK(part), (st.st_mode & S_IFMT) | 0600, st.st_rdev); \
+	sscanf(line.data(), "%s %*s %s", buf, buf2); \
+	xstat(buf, &st); \
+	mknod(PARTBLK(part), S_IFBLK | 0600, st.st_rdev); \
 	xmkdir(MIRRMNT(part), 0755); \
-	xmount(PARTBLK(part), MIRRMNT(part), me->mnt_type, flag, nullptr); \
+	xmount(PARTBLK(part), MIRRMNT(part), buf2, flag, nullptr); \
 	VLOGI("mount", PARTBLK(part), MIRRMNT(part)); \
 }
 
@@ -348,8 +346,8 @@ static bool magisk_env() {
 	unlink("/data/magisk_debug.log");
 
 	// Backwards compatibility
-	symlink("./magisk", "/sbin/.core");
-	symlink("./modules", MAGISKTMP "/img");
+	symlink(MAGISKTMP, "/sbin/.core");
+	symlink(MODULEMNT, MAGISKTMP "/img");
 
 	// Directories in tmpfs overlay
 	xmkdir(MIRRDIR, 0);
@@ -366,30 +364,25 @@ static bool magisk_env() {
 	LOGI("* Mounting mirrors");
 	bool system_as_root = false;
 	struct stat st;
-	parse_mnt("/proc/mounts", [&](mntent *me) {
-		if (DIR_IS(system_root)) {
+	file_readline("/proc/mounts", [&](string_view line) -> bool {
+		if (str_contains(line, " /system_root ")) {
 			mount_mirror(system_root, MS_RDONLY);
 			xsymlink(MIRRMNT(system_root) "/system", MIRRMNT(system));
 			VLOGI("link", MIRRMNT(system_root) "/system", MIRRMNT(system));
 			system_as_root = true;
-		} else if (!system_as_root && DIR_IS(system)) {
+		} else if (!system_as_root && str_contains(line, " /system ")) {
 			mount_mirror(system, MS_RDONLY);
-		} else if (DIR_IS(vendor)) {
+		} else if (str_contains(line, " /vendor ")) {
 			mount_mirror(vendor, MS_RDONLY);
-		} else if (DIR_IS(product)) {
-			mount_mirror(product, MS_RDONLY);
-		} else if (DIR_IS(data) && me->mnt_type != "tmpfs"sv) {
+		} else if (str_contains(line, " /data ") && !str_contains(line, "tmpfs")) {
 			mount_mirror(data, 0);
-		} else if (SDK_INT >= 24 && DIR_IS(proc) && !strstr(me->mnt_opts, "hidepid=2")) {
+		} else if (SDK_INT >= 24 &&
+		str_contains(line, " /proc ") && !str_contains(line, "hidepid=2")) {
+			// Enforce hidepid
 			xmount(nullptr, "/proc", nullptr, MS_REMOUNT, "hidepid=2,gid=3009");
 		}
 		return true;
 	});
-	if (access(MIRRMNT(system), F_OK) != 0 && access(MIRRMNT(system_root), F_OK) == 0) {
-		// Pre-init mirrors
-		xsymlink(MIRRMNT(system_root) "/system", MIRRMNT(system));
-		VLOGI("link", MIRRMNT(system_root) "/system", MIRRMNT(system));
-	}
 	if (access(MIRRMNT(vendor), F_OK) != 0) {
 		xsymlink(MIRRMNT(system) "/vendor", MIRRMNT(vendor));
 		VLOGI("link", MIRRMNT(system) "/vendor", MIRRMNT(vendor));
@@ -532,7 +525,7 @@ static void dump_logs() {
 	rename(LOGFILE, LOGFILE ".bak");
 	log_dump = true;
 	// Start a daemon thread and wait indefinitely
-	new_daemon_thread([]() -> void {
+	new_daemon_thread([](auto) -> void* {
 		int fd = xopen(LOGFILE, O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC, 0644);
 		exec_t exec {
 			.fd = fd,
@@ -542,9 +535,10 @@ static void dump_logs() {
 		close(fd);
 		if (pid < 0) {
 			log_dump = false;
-		} else {
-			waitpid(pid, nullptr, 0);
+			return nullptr;
 		}
+		waitpid(pid, nullptr, 0);
+		return nullptr;
 	});
 }
 
@@ -566,9 +560,6 @@ void post_fs_data(int client) {
 	// ack
 	write_int(client, 0);
 	close(client);
-
-	if (getenv("REMOUNT_ROOT"))
-		xmount(nullptr, "/", nullptr, MS_REMOUNT | MS_RDONLY, nullptr);
 
 	if (!check_data())
 		unblock_boot_process();
@@ -615,12 +606,12 @@ void post_fs_data(int client) {
 
 	prepare_modules();
 
-	restorecon();
-	chmod(SECURE_DIR, 0700);
-
 	// Core only mode
 	if (access(DISABLEFILE, F_OK) == 0)
 		core_only();
+
+	restorecon();
+	chmod(SECURE_DIR, 0700);
 
 	collect_modules();
 
@@ -663,14 +654,7 @@ void post_fs_data(int client) {
 		if (access(buf, F_OK) == 0) {
 			snprintf(buf2, PATH_MAX, "%s/%s/vendor", MODULEROOT, module);
 			unlink(buf2);
-			xsymlink("./system/vendor", buf2);
-		}
-		// If /system/product exists in module, create a link outside
-		snprintf(buf, PATH_MAX, "%s/%s/system/product", MODULEROOT, module);
-		if (access(buf, F_OK) == 0) {
-			snprintf(buf2, PATH_MAX, "%s/%s/product", MODULEROOT, module);
-			unlink(buf2);
-			xsymlink("./system/product", buf2);
+			xsymlink(buf, buf2);
 		}
 		sys_root->create_module_tree(module);
 	}
@@ -679,10 +663,6 @@ void post_fs_data(int client) {
 		// Pull out special nodes if exist
 		node_entry *special;
 		if ((special = sys_root->extract("vendor"))) {
-			special->magic_mount();
-			delete special;
-		}
-		if ((special = sys_root->extract("product"))) {
 			special->magic_mount();
 			delete special;
 		}
@@ -713,14 +693,6 @@ void late_start(int client) {
 			exec_command_sync("/system/bin/reboot", "recovery");
 		else
 			exec_command_sync("/system/bin/reboot");
-	}
-
-	if (access(BBPATH, F_OK) != 0){
-		LOGE("* post-fs-data mode is not triggered\n");
-		unlock_blocks();
-		magisk_env();
-		prepare_modules();
-		close(xopen(DISABLEFILE, O_RDONLY | O_CREAT | O_CLOEXEC, 0));
 	}
 
 	auto_start_magiskhide();

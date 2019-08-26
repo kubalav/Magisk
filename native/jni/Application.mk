@@ -17,5 +17,8 @@ endif
 
 # Busybox require some additional settings
 ifdef B_BB
+APP_CFLAGS := -Os -fomit-frame-pointer -flto
+APP_SHORT_COMMANDS := true
+NDK_TOOLCHAIN_VERSION := 4.9
 APP_PLATFORM := android-21
 endif

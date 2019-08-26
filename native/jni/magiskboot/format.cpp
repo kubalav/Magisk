@@ -89,7 +89,7 @@ const char *Fmt2Ext::operator[](format_t fmt) {
 		case GZIP:
 			return ".gz";
 		case LZOP:
-			return ".lzo";
+			return ".lzop";
 		case XZ:
 			return ".xz";
 		case LZMA:

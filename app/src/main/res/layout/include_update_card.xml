@@ -7,8 +7,6 @@
 
         <import type="com.topjohnwu.magisk.ui.home.MagiskState" />
 
-        <import type="com.topjohnwu.magisk.ui.home.MagiskItem" />
-
         <import type="com.topjohnwu.magisk.R" />
 
         <variable
@@ -51,7 +49,7 @@
         <com.google.android.material.button.MaterialButton
             android:id="@+id/install"
             style="@style/Widget.Button.Text"
-            gone="@{state == MagiskState.LOADING || !viewModel.isConnected}"
+            gone="@{state == MagiskState.LOADING}"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginEnd="8dp"
@@ -92,59 +90,64 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginEnd="8dp"
-            style="@style/Widget.Text.Emphasize"
+            android:maxLines="1"
             android:paddingTop="3dp"
             android:paddingBottom="3dp"
             android:text="@{text}"
-            android:maxLines="2"
+            android:textAppearance="?android:attr/textAppearanceMedium"
+            app:autoSizeMinTextSize="1sp"
+            app:autoSizeTextType="uniform"
             app:layout_constraintBottom_toTopOf="@+id/current_version"
             app:layout_constraintEnd_toStartOf="@+id/install"
             app:layout_constraintStart_toEndOf="@+id/status_icon"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintVertical_chainStyle="packed"
-            tools:text="@tools:sample/lorem/random" />
+            tools:text="Magisk is up to date" />
 
         <androidx.appcompat.widget.AppCompatTextView
             android:id="@+id/current_version"
             gone="@{state == MagiskState.LOADING || currentVersion.length == 0}"
             android:layout_width="0dp"
-            style="@style/Widget.Text.Caption.Inactive"
             android:layout_height="wrap_content"
-            android:maxLines="2"
+            android:maxLines="1"
             android:text="@{state != MagiskState.LOADING ? @string/current_installed(currentVersion) : @string/checking_for_updates}"
+            app:autoSizeMinTextSize="1sp"
+            app:autoSizeTextType="uniform"
             app:layout_constraintBottom_toTopOf="@+id/latest_version"
             app:layout_constraintEnd_toEndOf="@+id/status"
             app:layout_constraintStart_toStartOf="@+id/status"
             app:layout_constraintTop_toBottomOf="@+id/status"
-            tools:text="@tools:sample/lorem/random" />
+            tools:text="@string/checking_for_updates" />
 
         <androidx.appcompat.widget.AppCompatTextView
             android:id="@+id/latest_version"
-            gone="@{currentVersion == latestVersion || !viewModel.isConnected}"
+            gone="@{currentVersion == latestVersion}"
             android:layout_width="0dp"
-            style="@style/Widget.Text.Caption.Inactive"
             android:layout_height="wrap_content"
-            android:maxLines="2"
+            android:maxLines="1"
             android:text="@{state != MagiskState.LOADING ? @string/latest_version(latestVersion) : @string/checking_for_updates}"
+            app:autoSizeMinTextSize="1sp"
+            app:autoSizeTextType="uniform"
             app:layout_constraintBottom_toTopOf="@+id/additional"
             app:layout_constraintEnd_toEndOf="@+id/status"
             app:layout_constraintStart_toStartOf="@+id/status"
             app:layout_constraintTop_toBottomOf="@+id/current_version"
-            tools:text="@tools:sample/lorem/random" />
+            tools:text="@string/checking_for_updates" />
 
         <androidx.appcompat.widget.AppCompatTextView
             android:id="@+id/additional"
             gone="@{additionalInfo.length == 0}"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            style="@style/Widget.Text.Caption.Inactive"
-            android:maxLines="2"
+            android:maxLines="1"
             android:text="@{additionalInfo}"
+            app:autoSizeMinTextSize="1sp"
+            app:autoSizeTextType="uniform"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="@+id/status"
             app:layout_constraintStart_toStartOf="@+id/status"
             app:layout_constraintTop_toBottomOf="@+id/latest_version"
-            tools:text="@tools:sample/lorem/random" />
+            tools:text="@string/checking_for_updates" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 

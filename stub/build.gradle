@@ -4,7 +4,7 @@ android {
     defaultConfig {
         applicationId 'com.topjohnwu.magisk'
         versionCode 1
-        versionName props['appVersion']
+        versionName configProps['appVersion']
     }
 
     buildTypes {
@@ -16,5 +16,6 @@ android {
 
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation project(':net')
     implementation project(':shared')
 }

@@ -9,11 +9,9 @@ import com.skoumal.teanity.util.DiffObservableList
 import com.skoumal.teanity.util.KObservableField
 import com.skoumal.teanity.viewevents.SnackbarEvent
 import com.topjohnwu.magisk.BR
-import com.topjohnwu.magisk.Config
 import com.topjohnwu.magisk.Const
 import com.topjohnwu.magisk.R
 import com.topjohnwu.magisk.data.repository.LogRepository
-import com.topjohnwu.magisk.model.binding.BindingAdapter
 import com.topjohnwu.magisk.model.entity.recycler.ConsoleRvItem
 import com.topjohnwu.magisk.model.entity.recycler.LogItemRvItem
 import com.topjohnwu.magisk.model.entity.recycler.LogRvItem
@@ -23,8 +21,8 @@ import com.topjohnwu.magisk.ui.base.MagiskViewModel
 import com.topjohnwu.superuser.Shell
 import me.tatarka.bindingcollectionadapter2.BindingViewPagerAdapter
 import me.tatarka.bindingcollectionadapter2.OnItemBind
-import timber.log.Timber
 import java.io.File
+import java.io.IOException
 import java.util.*
 
 class LogViewModel(
@@ -32,7 +30,6 @@ class LogViewModel(
     private val logRepo: LogRepository
 ) : MagiskViewModel(), BindingViewPagerAdapter.PageTitles<ComparableRvItem<*>> {
 
-    val itemsAdapter = BindingAdapter()
     val items = DiffObservableList(ComparableRvItem.callback)
     val itemBinding = OnItemBind<ComparableRvItem<*>> { itemBinding, _, item ->
         item.bind(itemBinding)
@@ -43,8 +40,6 @@ class LogViewModel(
 
     private val logItem get() = items[0] as LogRvItem
     private val magiskLogItem get() = items[1] as MagiskLogRvItem
-
-    val scrollPosition = KObservableField(0)
 
     init {
         currentPage.addOnPropertyChangedCallback {
@@ -62,10 +57,6 @@ class LogViewModel(
         else -> ""
     }
 
-    fun scrollDownPressed() {
-        scrollPosition.value = magiskLogItem.items.size - 1
-    }
-
     fun refresh() {
         fetchLogs().subscribeK { logItem.update(it) }
         fetchMagiskLog().subscribeK { magiskLogItem.update(it) }
@@ -79,11 +70,10 @@ class LogViewModel(
             now.get(Calendar.MINUTE), now.get(Calendar.SECOND)
         )
 
-        val logFile = File(Config.downloadDirectory, filename)
-        runCatching {
+        val logFile = File(Const.EXTERNAL_PATH, filename)
+        try {
             logFile.createNewFile()
-        }.onFailure {
-            Timber.e(it)
+        } catch (e: IOException) {
             return
         }
 

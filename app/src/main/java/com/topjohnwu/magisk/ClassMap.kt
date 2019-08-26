@@ -1,6 +1,6 @@
 package com.topjohnwu.magisk
 
-import com.topjohnwu.magisk.model.download.DownloadService
+import com.topjohnwu.magisk.model.download.DownloadModuleService
 import com.topjohnwu.magisk.model.receiver.GeneralReceiver
 import com.topjohnwu.magisk.model.update.UpdateCheckService
 import com.topjohnwu.magisk.ui.MainActivity
@@ -16,11 +16,12 @@ object ClassMap {
         FlashActivity::class.java to a.f::class.java,
         UpdateCheckService::class.java to a.g::class.java,
         GeneralReceiver::class.java to a.h::class.java,
-        DownloadService::class.java to a.j::class.java,
+        DownloadModuleService::class.java to a.j::class.java,
         SuRequestActivity::class.java to a.m::class.java
     )
 
-    operator fun <T : Class<*>>get(c: Class<*>): T {
-        return map.getOrElse(c) { throw IllegalArgumentException() } as T
+    @JvmStatic
+    operator fun get(c: Class<*>): Class<*>? {
+        return map.getOrElse(c) { null } //as? Class<T>
     }
 }

@@ -87,5 +87,3 @@ void broadcast_test();
 extern int SDK_INT;
 extern bool RECOVERY_MODE;
 extern bool CONNECT_BROADCAST;
-
-#define APP_DATA_DIR (SDK_INT >= 24 ? "/data/user_de" : "/data/user")

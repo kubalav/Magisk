@@ -17,15 +17,13 @@ typedef enum {
 	BZIP2,
 	LZ4,
 	LZ4_LEGACY,
-/* Unsupported compression */
-	LZOP,
 /* Misc */
+	LZOP,
 	MTK,
 	DTB,
 } format_t;
 
 #define COMPRESSED(fmt)  ((fmt) >= GZIP && (fmt) <= LZ4_LEGACY)
-#define COMPRESSED_ANY(fmt)  ((fmt) >= GZIP && (fmt) <= LZOP)
 
 #define BOOT_MAGIC      "ANDROID!"
 #define CHROMEOS_MAGIC  "CHROMEOS"

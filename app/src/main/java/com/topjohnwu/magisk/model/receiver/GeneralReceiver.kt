@@ -6,24 +6,21 @@ import android.content.Intent
 import com.topjohnwu.magisk.ClassMap
 import com.topjohnwu.magisk.Config
 import com.topjohnwu.magisk.Const
-import com.topjohnwu.magisk.Info
-import com.topjohnwu.magisk.data.database.PolicyDao
 import com.topjohnwu.magisk.data.database.base.su
-import com.topjohnwu.magisk.extensions.inject
-import com.topjohnwu.magisk.extensions.reboot
-import com.topjohnwu.magisk.model.download.DownloadService
-import com.topjohnwu.magisk.model.entity.ManagerJson
-import com.topjohnwu.magisk.model.entity.internal.Configuration
-import com.topjohnwu.magisk.model.entity.internal.DownloadSubject
+import com.topjohnwu.magisk.data.repository.AppRepository
 import com.topjohnwu.magisk.ui.surequest.SuRequestActivity
+import com.topjohnwu.magisk.utils.DownloadApp
+import com.topjohnwu.magisk.utils.RootUtils
 import com.topjohnwu.magisk.utils.SuLogger
+import com.topjohnwu.magisk.utils.inject
+import com.topjohnwu.magisk.utils.get
 import com.topjohnwu.magisk.view.Notifications
 import com.topjohnwu.magisk.view.Shortcuts
 import com.topjohnwu.superuser.Shell
 
 open class GeneralReceiver : BroadcastReceiver() {
 
-    private val policyDB: PolicyDao by inject()
+    private val appRepo: AppRepository by inject()
 
     companion object {
         const val REQUEST = "request"
@@ -33,19 +30,21 @@ open class GeneralReceiver : BroadcastReceiver() {
     }
 
     private fun getPkg(intent: Intent): String {
-        return intent.data?.encodedSchemeSpecificPart.orEmpty()
+        return intent.data?.encodedSchemeSpecificPart ?: ""
     }
 
     override fun onReceive(context: Context, intent: Intent?) {
-        intent ?: return
-        when (intent.action ?: return) {
+        if (intent == null)
+            return
+        var action: String? = intent.action ?: return
+        when (action) {
             Intent.ACTION_REBOOT, Intent.ACTION_BOOT_COMPLETED -> {
-                val action = intent.getStringExtra("action")
+                action = intent.getStringExtra("action")
                 if (action == null) {
                     // Actual boot completed event
-                    Shell.su("mm_patch_dtbo").submit {
-                        if (it.isSuccess)
-                            Notifications.dtboPatched(context)
+                    Shell.su("mm_patch_dtbo").submit { result ->
+                        if (result.isSuccess)
+                            Notifications.dtboPatched()
                     }
                     return
                 }
@@ -65,23 +64,20 @@ open class GeneralReceiver : BroadcastReceiver() {
             }
             Intent.ACTION_PACKAGE_REPLACED ->
                 // This will only work pre-O
-                if (Config.suReAuth)
-                    policyDB.delete(getPkg(intent)).blockingGet()
+                if (Config.get<Boolean>(Config.Key.SU_REAUTH)!!) {
+                    appRepo.delete(getPkg(intent)).blockingGet()
+                }
             Intent.ACTION_PACKAGE_FULLY_REMOVED -> {
                 val pkg = getPkg(intent)
-                policyDB.delete(pkg).blockingGet()
+                appRepo.delete(pkg).blockingGet()
                 "magiskhide --rm $pkg".su().blockingGet()
             }
             Intent.ACTION_LOCALE_CHANGED -> Shortcuts.setup(context)
             Const.Key.BROADCAST_MANAGER_UPDATE -> {
-                intent.getParcelableExtra<ManagerJson>(Const.Key.INTENT_SET_APP)?.let {
-                    Info.remote = Info.remote.copy(app = it)
-                }
-                DownloadService(context) {
-                    subject = DownloadSubject.Manager(Configuration.APK.Upgrade)
-                }
+                Config.managerLink = intent.getStringExtra(Const.Key.INTENT_SET_LINK)
+                DownloadApp.upgrade(intent.getStringExtra(Const.Key.INTENT_SET_NAME))
             }
-            Const.Key.BROADCAST_REBOOT -> reboot()
+            Const.Key.BROADCAST_REBOOT -> RootUtils.reboot()
         }
     }
 }

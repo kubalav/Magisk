@@ -8,7 +8,7 @@
 #include <vector>
 #include <string>
 
-#include <logging.h>
+#include <magisk.h>
 #include <utils.h>
 #include <flags.h>
 

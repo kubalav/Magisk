@@ -9,7 +9,7 @@
 #include <vector>
 #include <algorithm>
 
-#include <logging.h>
+#include <magisk.h>
 #include <resetprop.h>
 #include <utils.h>
 #include <flags.h>
@@ -17,7 +17,7 @@
 #define _REALLY_INCLUDE_SYS__SYSTEM_PROPERTIES_H_
 #include "private/_system_properties.h"
 #include "private/system_properties.h"
-#include "private/resetprop.h"
+#include "_resetprop.h"
 
 using namespace std;
 
@@ -80,14 +80,15 @@ illegal:
 
 static void read_props(const prop_info *pi, void *read_cb) {
 	__system_property_read_callback(
-			pi, [](auto cb, auto name, auto value, auto) {
+			pi, [](auto cb, auto name, auto value, auto) -> void
+			{
 				((read_cb_t *) cb)->exec(name, value);
 			}, read_cb);
 }
 
 void collect_props(const char *name, const char *value, void *v_plist) {
-	auto prop_list = static_cast<vector<prop_t> *>(v_plist);
-	prop_list->emplace_back(name, value);
+	auto &prop_list = *static_cast<vector<prop_t> *>(v_plist);
+	prop_list.emplace_back(name, value);
 }
 
 static void collect_unique_props(const char *name, const char *value, void *v_plist) {
@@ -120,18 +121,15 @@ static void print_props(bool persist) {
  * Implementations of functions in resetprop.h (APIs)
  * **************************************************/
 
-#define ENSURE_INIT(ret) if (init_resetprop()) return ret
-
 int prop_exist(const char *name) {
-	ENSURE_INIT(0);
+	if (init_resetprop()) return 0;
 	return __system_property_find(name) != nullptr;
 }
 
 // Get prop by name, return string
 string getprop(const char *name, bool persist) {
-	if (!check_legal_property_name(name))
+	if (!check_legal_property_name(name) || init_resetprop())
 		return string();
-	ENSURE_INIT(string());
 	const prop_info *pi = __system_property_find(name);
 	if (pi == nullptr) {
 		if (persist && strncmp(name, "persist.", 8) == 0) {
@@ -153,7 +151,7 @@ string getprop(const char *name, bool persist) {
 }
 
 void getprop(void (*callback)(const char *, const char *, void *), void *cookie, bool persist) {
-	ENSURE_INIT();
+	if (init_resetprop()) return;
 	read_cb_t read_cb(callback, cookie);
 	__system_property_foreach(read_props, &read_cb);
 	if (persist) {
@@ -165,7 +163,8 @@ void getprop(void (*callback)(const char *, const char *, void *), void *cookie,
 int setprop(const char *name, const char *value, bool trigger) {
 	if (!check_legal_property_name(name))
 		return 1;
-	ENSURE_INIT(-1);
+	if (init_resetprop())
+		return -1;
 
 	int ret;
 
@@ -198,7 +197,7 @@ int setprop(const char *name, const char *value, bool trigger) {
 int deleteprop(const char *name, bool persist) {
 	if (!check_legal_property_name(name))
 		return 1;
-	ENSURE_INIT(-1);
+	if (init_resetprop()) return -1;
 	char path[PATH_MAX];
 	path[0] = '\0';
 	LOGD("resetprop: deleteprop [%s]\n", name);
@@ -208,7 +207,7 @@ int deleteprop(const char *name, bool persist) {
 }
 
 void load_prop_file(const char *filename, bool trigger) {
-	ENSURE_INIT();
+	if (init_resetprop()) return;
 	LOGD("resetprop: Parse prop file [%s]\n", filename);
 	parse_prop_file(filename, [=](auto key, auto val) -> bool {
 		setprop(key.data(), val.data(), trigger);

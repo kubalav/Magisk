@@ -16,9 +16,8 @@ static void hex2byte(uint8_t *hex, uint8_t *str) {
 	}
 }
 
-int hexpatch(const char *image, const char *from, const char *to) {
+void hexpatch(const char *image, const char *from, const char *to) {
 	int patternsize = strlen(from) / 2, patchsize = strlen(to) / 2;
-	int patched = 1;
 	size_t filesize;
 	uint8_t *file, *pattern, *patch;
 	mmap_rw(image, file, filesize);
@@ -32,12 +31,9 @@ int hexpatch(const char *image, const char *from, const char *to) {
 			memset(file + i, 0, patternsize);
 			memcpy(file + i, patch, patchsize);
 			i += patternsize - 1;
-			patched = 0;
 		}
 	}
 	munmap(file, filesize);
 	free(pattern);
 	free(patch);
-
-	return patched;
 }
