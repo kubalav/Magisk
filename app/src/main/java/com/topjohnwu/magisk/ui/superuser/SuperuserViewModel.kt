@@ -10,22 +10,22 @@ import com.skoumal.teanity.util.DiffObservableList
 import com.skoumal.teanity.viewevents.SnackbarEvent
 import com.topjohnwu.magisk.BR
 import com.topjohnwu.magisk.R
-import com.topjohnwu.magisk.data.repository.AppRepository
+import com.topjohnwu.magisk.data.database.PolicyDao
+import com.topjohnwu.magisk.extensions.toggle
 import com.topjohnwu.magisk.model.entity.MagiskPolicy
-import com.topjohnwu.magisk.model.entity.Policy
 import com.topjohnwu.magisk.model.entity.recycler.PolicyRvItem
 import com.topjohnwu.magisk.model.events.PolicyEnableEvent
 import com.topjohnwu.magisk.model.events.PolicyUpdateEvent
 import com.topjohnwu.magisk.ui.base.MagiskViewModel
 import com.topjohnwu.magisk.utils.FingerprintHelper
-import com.topjohnwu.magisk.utils.toggle
 import com.topjohnwu.magisk.view.dialogs.CustomAlertDialog
 import com.topjohnwu.magisk.view.dialogs.FingerprintAuthDialog
 import io.reactivex.Single
+import io.reactivex.disposables.Disposable
 import me.tatarka.bindingcollectionadapter2.ItemBinding
 
 class SuperuserViewModel(
-    private val appRepo: AppRepository,
+    private val policyDB: PolicyDao,
     private val packageManager: PackageManager,
     private val resources: Resources,
     rxBus: RxBus
@@ -38,6 +38,7 @@ class SuperuserViewModel(
     }
 
     private var ignoreNext: PolicyRvItem? = null
+    private var fetchTask: Disposable? = null
 
     init {
         rxBus.register<PolicyEnableEvent>()
@@ -51,14 +52,21 @@ class SuperuserViewModel(
     }
 
     fun updatePolicies() {
-        appRepo.fetchAll()
+        if (fetchTask?.isDisposed?.not() == true) return
+        fetchTask = policyDB.fetchAll()
             .flattenAsFlowable { it }
             .map { PolicyRvItem(it, it.applicationInfo.loadIcon(packageManager)) }
             .toList()
+            .map {
+                it.sortedWith(compareBy(
+                    { it.item.appName.toLowerCase() },
+                    { it.item.packageName }
+                ))
+            }
+            .map { it to items.calculateDiff(it) }
             .applySchedulers()
             .applyViewModel(this)
-            .subscribeK { items.update(it) }
-            .add()
+            .subscribeK { items.update(it.first, it.second) }
     }
 
     fun deletePressed(item: PolicyRvItem) {
@@ -109,7 +117,7 @@ class SuperuserViewModel(
             val app = item.item.copy(policy = if (enable) MagiskPolicy.ALLOW else MagiskPolicy.DENY)
 
             updatePolicy(app)
-                .map { it.policy == Policy.ALLOW }
+                .map { it.policy == MagiskPolicy.ALLOW }
                 .subscribeK {
                     val textId = if (it) R.string.su_snack_grant else R.string.su_snack_deny
                     val text = resources.getString(textId).format(item.item.appName)
@@ -131,9 +139,9 @@ class SuperuserViewModel(
     }
 
     private fun updatePolicy(policy: MagiskPolicy) =
-        appRepo.update(policy).andThen(Single.just(policy))
+        policyDB.update(policy).andThen(Single.just(policy))
 
     private fun deletePolicy(policy: MagiskPolicy) =
-        appRepo.delete(policy.uid).andThen(Single.just(policy))
+        policyDB.delete(policy.uid).andThen(Single.just(policy))
 
 }

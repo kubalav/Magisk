@@ -1,10 +1,13 @@
 package com.topjohnwu.magisk.ui.base
 
+import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
 import androidx.annotation.CallSuper
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.collection.SparseArrayCompat
 import androidx.core.net.toUri
 import androidx.databinding.ViewDataBinding
 import androidx.fragment.app.Fragment
@@ -16,8 +19,10 @@ import com.karumi.dexter.listener.PermissionRequest
 import com.karumi.dexter.listener.multi.MultiplePermissionsListener
 import com.ncapdevi.fragnav.FragNavController
 import com.ncapdevi.fragnav.FragNavTransactionOptions
+import com.skoumal.teanity.view.TeanityActivity
 import com.skoumal.teanity.viewevents.ViewEvent
 import com.topjohnwu.magisk.Config
+import com.topjohnwu.magisk.extensions.set
 import com.topjohnwu.magisk.model.events.BackPressEvent
 import com.topjohnwu.magisk.model.events.PermissionEvent
 import com.topjohnwu.magisk.model.events.ViewActionEvent
@@ -27,16 +32,20 @@ import com.topjohnwu.magisk.model.navigation.Navigator
 import com.topjohnwu.magisk.model.permissions.PermissionRequestBuilder
 import com.topjohnwu.magisk.utils.LocaleManager
 import com.topjohnwu.magisk.utils.Utils
+import com.topjohnwu.magisk.utils.currentLocale
 import timber.log.Timber
 import kotlin.reflect.KClass
 
+typealias RequestCallback = MagiskActivity<*, *>.(Int, Intent?) -> Unit
 
 abstract class MagiskActivity<ViewModel : MagiskViewModel, Binding : ViewDataBinding> :
-    MagiskLeanbackActivity<ViewModel, Binding>(), FragNavController.RootFragmentListener,
-    Navigator, FragNavController.TransactionListener {
+        TeanityActivity<ViewModel, Binding>(), FragNavController.RootFragmentListener,
+        Navigator, FragNavController.TransactionListener {
 
     override val numberOfRootFragments: Int get() = baseFragments.size
     override val baseFragments: List<KClass<out Fragment>> = listOf()
+    private val resultCallbacks = SparseArrayCompat<RequestCallback>()
+
 
     protected open val defaultPosition: Int = 0
 
@@ -50,20 +59,22 @@ abstract class MagiskActivity<ViewModel : MagiskViewModel, Binding : ViewDataBin
         get() = navigationController?.let { it.currentStackIndex != defaultPosition } ?: false
 
     init {
-        val isDarkTheme = Config.get<Boolean>(Config.Key.DARK_THEME)
-        val theme = if (isDarkTheme) {
+        val theme = if (Config.darkTheme) {
             AppCompatDelegate.MODE_NIGHT_YES
         } else {
             AppCompatDelegate.MODE_NIGHT_NO
         }
         AppCompatDelegate.setDefaultNightMode(theme)
-        AppCompatDelegate.setCompatVectorFromResourcesEnabled(true)
     }
 
     override fun applyOverrideConfiguration(config: Configuration?) {
         // Force applying our preferred local
-        config?.setLocale(LocaleManager.locale)
+        config?.setLocale(currentLocale)
         super.applyOverrideConfiguration(config)
+    }
+
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(LocaleManager.getLocaleContext(base))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -185,19 +196,23 @@ abstract class MagiskActivity<ViewModel : MagiskViewModel, Binding : ViewDataBin
         Dexter.withActivity(this)
             .withPermissions(*permissions)
             .withListener(object : MultiplePermissionsListener {
-                override fun onPermissionsChecked(report: MultiplePermissionsReport?) =
-                    if (report?.areAllPermissionsGranted() == true) {
+                override fun onPermissionsChecked(report: MultiplePermissionsReport) {
+                    if (report.areAllPermissionsGranted()) {
                         request.onSuccess()
                     } else {
                         request.onFailure()
                     }
+                }
 
                 override fun onPermissionRationaleShouldBeShown(
-                    permissions: MutableList<PermissionRequest>?,
-                    token: PermissionToken?
-                ) = request.onShowRationale(permissions.orEmpty().map { it.name })
-            })
-            .check()
+                    permissions: MutableList<PermissionRequest>,
+                    token: PermissionToken
+                ) = token.continuePermissionRequest()
+            }).check()
+    }
+
+    fun withExternalRW(builder: PermissionRequestBuilder.() -> Unit) {
+        withPermissions(Manifest.permission.WRITE_EXTERNAL_STORAGE, builder = builder)
     }
 
     private fun FragNavTransactionOptions.Builder.customAnimations(options: MagiskAnimBuilder) =
@@ -206,5 +221,22 @@ abstract class MagiskActivity<ViewModel : MagiskViewModel, Binding : ViewDataBin
                 transition(FragmentTransaction.TRANSIT_FRAGMENT_OPEN)
             }
         }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        resultCallbacks[requestCode]?.apply {
+            resultCallbacks.remove(requestCode)
+            invoke(this@MagiskActivity, resultCode, data)
+        }
+    }
+
+    fun startActivityForResult(
+            intent: Intent,
+            requestCode: Int,
+            listener: RequestCallback
+    ) {
+        resultCallbacks[requestCode] = listener
+        startActivityForResult(intent, requestCode)
+    }
 
 }

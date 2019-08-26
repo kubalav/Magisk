@@ -25,10 +25,24 @@ class MagiskHideFragment : MagiskFragment<HideViewModel, FragmentMagiskHideBindi
     override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
         inflater.inflate(R.menu.menu_magiskhide, menu)
         menu.apply {
-            (findItem(R.id.app_search).actionView as? SearchView)
-                ?.setOnQueryTextListener(this@MagiskHideFragment)
+            val query = viewModel.query.value
+            val searchItem = menu.findItem(R.id.app_search)
+            val searchView = searchItem.actionView as? SearchView
 
-            val showSystem = Config.get<Boolean>(Config.Key.SHOW_SYSTEM_APP)
+            searchView?.run {
+                setOnQueryTextListener(this@MagiskHideFragment)
+                setQuery(query, false)
+            }
+
+            if (query.isNotBlank()) {
+                searchItem.expandActionView()
+                searchView?.isIconified = false
+            } else {
+                searchItem.collapseActionView()
+                searchView?.isIconified = true
+            }
+
+            val showSystem = Config.showSystemApp
 
             findItem(R.id.show_system).isChecked = showSystem
             viewModel.isShowSystem.value = showSystem
@@ -39,10 +53,8 @@ class MagiskHideFragment : MagiskFragment<HideViewModel, FragmentMagiskHideBindi
         if (item.itemId == R.id.show_system) {
             val showSystem = !item.isChecked
             item.isChecked = showSystem
-            Config.set(Config.Key.SHOW_SYSTEM_APP, showSystem)
+            Config.showSystemApp = showSystem
             viewModel.isShowSystem.value = showSystem
-            //adapter!!.setShowSystem(showSystem)
-            //adapter!!.filter(search!!.query.toString())
         }
         return true
     }
@@ -56,9 +68,4 @@ class MagiskHideFragment : MagiskFragment<HideViewModel, FragmentMagiskHideBindi
         viewModel.query.value = query.orEmpty()
         return false
     }
-
-    /*override fun onEvent(event: Int) {
-        //mSwipeRefreshLayout!!.isRefreshing = false
-        adapter!!.filter(search!!.query.toString())
-    }*/
 }
